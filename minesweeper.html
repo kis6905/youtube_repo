@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+
+    <style>
+      .content {
+        margin-top: 3rem;
+        text-align: center;
+      }
+      .mine-panel {
+        width: 500px;
+        padding: 0 1rem;
+        margin: auto;
+      }
+      .mine-row {
+        margin-top: 0.2rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <v-app>
+        <div class="content">
+          <div class="title">
+            <h3>지뢰찾기</h3>
+          </div>
+          <div class="mt-5 mb-5">
+            <v-btn
+              color="green"
+              @click="handleRefresh"
+            >
+              다시하기
+            </v-btn>
+            <v-btn
+              color="red"
+              @click="handleShowMine"
+            >
+              {{ showMineBtnText }}
+            </v-btn>
+          </div>
+          <div class="mine-panel mt-5">
+            <div
+              v-for="(cols, y) in blocks"
+              :key="'row' + y"
+              class="mine-row"
+            >
+              <v-btn
+                v-for="(block, x) in cols"
+                :key="'block' + block.id"
+                class="mr-0 mr-1"
+                min-width="40"
+                max-width="40"
+                min-height="40"
+                color="grey lighten-1"
+                :disabled="block.clicked"
+                @click="handleClickBlock(x, y)"
+              >
+                <v-icon v-if="(block.clicked && block.isMine) || (showMine && block.isMine)" small>mdi-bomb</v-icon>
+                <span v-else-if="block.clicked">{{ block.value }}</span>
+                <span v-else></span>
+              </v-btn>
+            </div>
+          </div>
+        </div>
+
+        <v-dialog
+          v-model="showModal"
+          width="300"
+          persistent
+        >
+          <v-card class="pt-5">
+            <v-card-text>
+              {{ dialogContents }}
+            </v-card-text>
+            <v-divider></v-divider>
+            <v-card-actions>
+              <v-spacer></v-spacer>
+              <v-btn
+                color="green"
+                text
+                @click="handleRefresh"
+              >
+                다시하기
+              </v-btn>
+              <v-btn
+                color="default"
+                text
+                @click="showModal = false"
+              >
+                닫기
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
+      </v-app>
+    </div>
+
+    <script>
+      new Vue({
+        el: '#app',
+        vuetify: new Vuetify({
+          theme: { dark: true },
+        }),
+        data () {
+          return {
+            size: 10,
+            totalBlockCount: 0,
+            blocks: [],
+            clickedCount: 0,
+            showMine: false,
+            showModal: false,
+            dialogContents: ''
+          }
+        },
+        created () {
+          this.init()
+        },
+        methods: {
+          init () {
+            this.clickedCount = 0
+            this.showModal = false
+            this.showMine = false
+
+            const rows = []
+            const mineBlockIds = this.getMineBlockIds(this.size)
+            
+            let blockId = 0
+            for (let rowNum = 0; rowNum < this.size; rowNum++) {
+              let cols = []
+              for (let colNum = 0; colNum < this.size; colNum++) {
+                let isMine = mineBlockIds.includes(blockId)
+                cols.push({ id: blockId, isMine: isMine, clicked: false, value: 0 })
+                blockId++
+              }
+              rows.push(cols)
+            }
+            this.blocks = rows
+            this.totalBlockCount = this.size * this.size
+          },
+          getMineBlockIds (size) {
+            const mineBlockIds = []
+            for (let idx = 0; idx < size; idx++) {
+              while (true) {
+                let randomValue = this.getRandomInt(size)
+                if (!mineBlockIds.includes(randomValue)) {
+                  mineBlockIds.push(randomValue)
+                  break;
+                }
+              }
+            }
+            return mineBlockIds
+          },
+          getRandomInt (size) {
+            return Math.floor(Math.random() * (size * size))
+          },
+          handleClickBlock (x, y) {
+            const block = this.blocks[y][x]
+            block.clicked = true
+
+            if (block.isMine) {
+              this.dialogContents = '앗! 지뢰를 밟았습니다...'
+              this.showModal = true
+              this.showMine = true
+            }
+
+            let mineCount = 0
+            let minY = y - 1
+            let minX = x - 1
+            let maxY = y + 1
+            let maxX = x + 1
+            minY = minY < 0 ? 0 : minY
+            minX = minX < 0 ? 0 : minX
+            maxY = maxY >= this.size ? y : maxY
+            maxX = maxX >= this.size ? x : maxX
+
+            for (let currY = minY; currY <= maxY; currY++) {
+              for (let currX = minX; currX <= maxX; currX++) {
+                if (currY === y && currX === x) {
+                  continue
+                }
+                const neighborBlock = this.blocks[currY][currX]
+                if (neighborBlock.isMine) {
+                  mineCount++
+                }
+              }
+            }
+            block.value = mineCount
+            this.clickedCount++
+
+            console.log(this.totalBlockCount - this.clickedCount)
+            if (this.totalBlockCount - this.clickedCount === this.size) {
+              this.dialogContents = '지뢰를 모두 찾았습니다!'
+              this.showModal = true
+              this.showMine = true
+            }
+          },
+          handleShowMine () {
+            this.showMine = !this.showMine
+          },
+          handleRefresh () {
+            this.init()
+            this.showModal = false
+          }
+        },
+        computed: {
+          showMineBtnText () {
+            return this.showMine ? '숨기기' : '보이기'
+          }
+        }
+      })
+    </script>
+  </body>
+</html>
